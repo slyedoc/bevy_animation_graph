@@ -223,6 +223,7 @@ pub fn spawn_ragdoll_avian(
                         point_compliance: revolute_joint.point_compliance,
                         align_compliance: revolute_joint.align_compliance,
                         limit_compliance: revolute_joint.limit_compliance,
+                        motor: Default::default(),
                     },
                 ))
                 .id(),

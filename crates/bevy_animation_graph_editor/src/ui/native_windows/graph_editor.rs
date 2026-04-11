@@ -156,7 +156,7 @@ impl NativeEditorWindowExtension for GraphEditorWindow {
                         // Update selection for node inspector.
                         // And enable debug render for latest node selected only
 
-                        let graph = graph_assets.get_mut(&active_graph.handle).unwrap();
+                        let mut graph = graph_assets.get_mut(&active_graph.handle).unwrap();
                         for (_, node) in graph.nodes.iter_mut() {
                             node.should_debug = false;
                         }

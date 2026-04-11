@@ -2,7 +2,7 @@ use core::any::TypeId;
 use std::any::Any;
 
 use bevy::{
-    ecs::{system::command::trigger, world::CommandQueue},
+    ecs::world::CommandQueue,
     platform::collections::HashMap,
     prelude::*,
 };
@@ -147,22 +147,34 @@ fn menu_bar(ctx: &mut egui::Context, command_queue: &mut CommandQueue) {
             ui.menu_button("Assets", |ui| {
                 ui.menu_button("Create", |ui| {
                     if ui.button("Skeleton").clicked() {
-                        command_queue.push(trigger(RequestCreateSkeleton));
+                        command_queue.push(|world: &mut World| {
+                            world.trigger(RequestCreateSkeleton);
+                        });
                     }
                     if ui.button("Animation").clicked() {
-                        command_queue.push(trigger(RequestCreateClip));
+                        command_queue.push(|world: &mut World| {
+                            world.trigger(RequestCreateClip);
+                        });
                     }
                     if ui.button("Animation graph").clicked() {
-                        command_queue.push(trigger(RequestCreateAnimationGraph));
+                        command_queue.push(|world: &mut World| {
+                            world.trigger(RequestCreateAnimationGraph);
+                        });
                     }
                     if ui.button("State machine").clicked() {
-                        command_queue.push(trigger(RequestCreateFsm));
+                        command_queue.push(|world: &mut World| {
+                            world.trigger(RequestCreateFsm);
+                        });
                     }
                     if ui.button("Ragdoll").clicked() {
-                        command_queue.push(trigger(RequestCreateRagdoll));
+                        command_queue.push(|world: &mut World| {
+                            world.trigger(RequestCreateRagdoll);
+                        });
                     }
                     if ui.button("Ragdoll bone map").clicked() {
-                        command_queue.push(trigger(RequestCreateRagdollBoneMap));
+                        command_queue.push(|world: &mut World| {
+                            world.trigger(RequestCreateRagdollBoneMap);
+                        });
                     }
                     ui.disable();
                     if ui.button("Animated scene").clicked() {}
