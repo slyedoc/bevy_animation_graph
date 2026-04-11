@@ -202,6 +202,12 @@ pub struct SubSceneData<T> {
 #[derive(Component, Clone)]
 pub struct PartOfSubScene(pub egui::Id);
 
+/// Marks the root of a subscene hierarchy. Only added to the spawned root
+/// entity, never propagated to descendants — used so cleanup can despawn
+/// roots exactly once and rely on the child cascade for the rest.
+#[derive(Component)]
+pub struct SubSceneRoot;
+
 #[derive(Debug, Clone, Copy)]
 pub enum SubSceneSyncAction {
     Nothing,
@@ -297,6 +303,7 @@ pub fn setup_textured_render<T: SubSceneConfig>(
     commands.entity(root).insert((
         RenderLayers::from_layers(&[layer]),
         PartOfSubScene(widget_id),
+        SubSceneRoot,
     ));
 
     image_handle
@@ -314,7 +321,7 @@ pub fn update_config<T: SubSceneConfig>(
 pub fn cleanup_render_layer<T: SubSceneConfig>(
     In(widget_id): In<egui::Id>,
     mut commands: Commands,
-    query: Query<(Entity, &PartOfSubScene)>,
+    query: Query<(Entity, &PartOfSubScene), With<SubSceneRoot>>,
     mut egui_user_textures: ResMut<bevy_egui::EguiUserTextures>,
     mut subscenes: ResMut<SubScenes<T>>,
 ) {
