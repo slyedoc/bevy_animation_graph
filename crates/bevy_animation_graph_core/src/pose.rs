@@ -374,7 +374,12 @@ impl Pose {
 }
 
 fn additive_blend_quat(left: Quat, right: Quat, alpha: f32) -> Quat {
-    left.slerp(right * left, alpha)
+    // Compose `right^alpha` onto `left`. Using slerp from identity gives
+    // the scaled rotation `right^alpha`, then compose with left.
+    // This produces linear additive stacking through chained blends,
+    // which matches Spine's multi-track behavior.
+    let scaled_right = Quat::IDENTITY.slerp(right, alpha);
+    scaled_right * left
 }
 
 fn either_or_mix<T>(a: Option<T>, b: Option<T>, mix: impl Fn(T, T) -> T) -> Option<T> {
