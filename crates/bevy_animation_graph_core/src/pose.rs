@@ -173,16 +173,35 @@ impl BonePose {
     }
 
     pub fn linear_blend_mut(&mut self, other: &BonePose, alpha: f32) {
-        self.rotation = either_or_mix(self.rotation, other.rotation, |a, b| a.slerp(b, alpha));
-        self.translation =
-            either_or_mix(self.translation, other.translation, |a, b| a.lerp(b, alpha));
-        self.scale = either_or_mix(self.scale, other.scale, |a, b| a.lerp(b, alpha));
-        self.weights = either_or_mix(self.weights.clone(), other.weights.clone(), |a, b| {
-            a.iter()
-                .zip(b)
-                .map(|(old, new)| (new - old) * alpha)
-                .collect()
-        });
+        self.rotation = either_or_mix_with_default(
+            self.rotation,
+            other.rotation,
+            Quat::IDENTITY,
+            |a, b| a.slerp(b, alpha),
+        );
+        self.translation = either_or_mix_with_default(
+            self.translation,
+            other.translation,
+            Vec3::ZERO,
+            |a, b| a.lerp(b, alpha),
+        );
+        self.scale = either_or_mix_with_default(
+            self.scale,
+            other.scale,
+            Vec3::ONE,
+            |a, b| a.lerp(b, alpha),
+        );
+        self.weights = either_or_mix_with_default(
+            self.weights.clone(),
+            other.weights.clone(),
+            Vec::new(),
+            |a, b| {
+                a.iter()
+                    .zip(b)
+                    .map(|(old, new)| (new - old) * alpha)
+                    .collect()
+            },
+        );
     }
 
     pub fn difference_mut(&mut self, other: &BonePose) {
