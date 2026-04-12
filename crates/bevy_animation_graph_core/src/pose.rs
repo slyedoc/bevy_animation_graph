@@ -143,14 +143,33 @@ impl BonePose {
     }
 
     pub fn additive_blend_mut(&mut self, other: &BonePose, alpha: f32) {
-        self.rotation = either_or_mix(self.rotation, other.rotation, |a, b| {
-            additive_blend_quat(a, b, alpha)
-        });
-        self.translation = either_or_mix(self.translation, other.translation, |a, b| a + alpha * b);
-        self.scale = either_or_mix(self.scale, other.scale, |a, b| a + alpha * b);
-        self.weights = either_or_mix(self.weights.clone(), other.weights.clone(), |a, b| {
-            a.into_iter().zip(b).map(|(a, b)| a + alpha * b).collect()
-        });
+        // Use identity defaults when the base has no value so that the
+        // overlay is always scaled by alpha. Without this, a missing base
+        // value causes the overlay to be injected at full strength.
+        self.rotation = either_or_mix_with_default(
+            self.rotation,
+            other.rotation,
+            Quat::IDENTITY,
+            |a, b| additive_blend_quat(a, b, alpha),
+        );
+        self.translation = either_or_mix_with_default(
+            self.translation,
+            other.translation,
+            Vec3::ZERO,
+            |a, b| a + alpha * b,
+        );
+        self.scale = either_or_mix_with_default(
+            self.scale,
+            other.scale,
+            Vec3::ZERO,
+            |a, b| a + alpha * b,
+        );
+        self.weights = either_or_mix_with_default(
+            self.weights.clone(),
+            other.weights.clone(),
+            Vec::new(),
+            |a, b| a.into_iter().zip(b).map(|(a, b)| a + alpha * b).collect(),
+        );
     }
 
     pub fn linear_blend_mut(&mut self, other: &BonePose, alpha: f32) {
@@ -345,6 +364,23 @@ fn either_or_mix<T>(a: Option<T>, b: Option<T>, mix: impl Fn(T, T) -> T) -> Opti
         (None, None) => None,
         (Some(a), None) => Some(a),
         (None, Some(b)) => Some(b),
+    }
+}
+
+/// Like `either_or_mix` but when the base (a) is `None` and overlay (b) is
+/// `Some`, uses `default` as the base value and applies the mix function.
+/// This ensures the overlay is always scaled by alpha in additive blending.
+fn either_or_mix_with_default<T>(
+    a: Option<T>,
+    b: Option<T>,
+    default: T,
+    mix: impl Fn(T, T) -> T,
+) -> Option<T> {
+    match (a, b) {
+        (Some(a), Some(b)) => Some(mix(a, b)),
+        (None, None) => None,
+        (Some(a), None) => Some(a),
+        (None, Some(b)) => Some(mix(default, b)),
     }
 }
 
