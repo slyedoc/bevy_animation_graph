@@ -8,16 +8,16 @@
 //! - [`GraphClip`], which are defined in `*.anim.ron` files. These assets contain animation data,
 //!   similarly to Bevy's [`AnimationClip`]. The `*.anim.ron` files don't contain the actual
 //!   animation data, but rather point to the source for the
-//!   animation. Currently, animation from a Gltf file identified by their name label are supported.
-//!   For example:
+//!   animation. On the `aurora` branch that source is a baked `.animclip` (the importer owns
+//!   glTF; nothing loads one at runtime), and the clip names the skeleton it was baked onto:
 //!   ```ron
 //!   (
-//!       source: GltfNamed(
-//!           // Asset path of the (root) gltf asset
-//!           path: "models/Fox.glb",
-//!           // Name of the animation within that asset
-//!           animation_name: "Walk",
+//!       source: AnimClip(
+//!           // Asset path of the baked clip
+//!           path: "anim/human/Walk_Loop.animclip",
 //!       ),
+//!       skeleton: "people/player.skn.ron",
+//!       event_tracks: {},
 //!   )
 //!   ```
 //! - [`AnimationGraph`], defined in `*.animgraph.ron` files. These assets are the core
