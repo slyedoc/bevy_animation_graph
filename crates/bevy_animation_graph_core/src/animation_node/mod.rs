@@ -6,7 +6,7 @@ use std::{any::TypeId, fmt::Debug};
 use bevy::{
     platform::collections::HashMap,
     prelude::{Deref, DerefMut},
-    reflect::{FromType, prelude::*},
+    reflect::{CreateTypeData, prelude::*},
 };
 use uuid::Uuid;
 
@@ -70,11 +70,11 @@ pub struct ReflectEditProxy {
     pub to_proxy: fn(&dyn NodeLike) -> Box<dyn Reflect>,
 }
 
-impl<T> FromType<T> for ReflectEditProxy
+impl<T> CreateTypeData<T> for ReflectEditProxy
 where
     T: EditProxy + NodeLike,
 {
-    fn from_type() -> Self {
+    fn create_type_data(_input: ()) -> Self {
         Self {
             proxy_type_id: TypeId::of::<<T as EditProxy>::Proxy>(),
             from_proxy: from_proxy::<T>,

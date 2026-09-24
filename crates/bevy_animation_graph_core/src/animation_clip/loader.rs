@@ -1,20 +1,22 @@
 use bevy::{
     asset::{AssetLoader, AssetPath, LoadContext, io::Reader},
-    gltf::Gltf,
     platform::collections::HashMap,
     reflect::{Reflect, TypePath},
 };
 use serde::{Deserialize, Serialize};
 
-use super::GraphClip;
+use super::{GraphClip, animclip::parse_animclip};
 use crate::{errors::AssetLoaderError, event_track::EventTrack, utils::normalize_asset_path};
 
+/// Where a [`GraphClip`]'s curves come from.
+///
+/// On the aurora branch that is always a baked `.animclip`: the importer
+/// (`aurora_files`' `animlib_import`) owns glTF, retargets the source library onto the rig at
+/// bake time and writes the clip beside the `.bsn`. Nothing loads glTF at runtime, and this
+/// bevy no longer offers the immediate nested load the glTF source needed.
 #[derive(Reflect, Serialize, Deserialize, Clone, Debug)]
 pub enum GraphClipSource {
-    GltfNamed {
-        path: AssetPath<'static>,
-        animation_name: String,
-    },
+    AnimClip { path: AssetPath<'static> },
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -44,50 +46,20 @@ impl AssetLoader for GraphClipLoader {
         let serial: GraphClipSerial = ron::de::from_bytes(&bytes)?;
 
         let bevy_clip = match &serial.source {
-            GraphClipSource::GltfNamed {
-                path,
-                animation_name,
-            } => {
-                let gltf_loaded_asset = load_context
-                    .loader()
-                    .immediate()
-                    .with_unknown_type()
-                    .load(path)
-                    .await?;
-                let gltf: &Gltf = gltf_loaded_asset.get().unwrap();
-
-                let Some(clip_handle) = gltf
-                    .named_animations
-                    .get(&animation_name.clone().into_boxed_str())
-                else {
-                    return Err(AssetLoaderError::GltfMissingLabel(animation_name.clone()));
-                };
-
-                let Some(clip_path) = clip_handle.path() else {
-                    return Err(AssetLoaderError::GltfMissingLabel(animation_name.clone()));
-                };
-
-                let clip_bevy: bevy::animation::AnimationClip = gltf_loaded_asset
-                    .get_labeled(clip_path.label_cow().unwrap())
-                    .unwrap()
-                    .get::<bevy::animation::AnimationClip>()
-                    .unwrap()
-                    .clone();
-
-                clip_bevy
+            GraphClipSource::AnimClip { path } => {
+                let clip_bytes = load_context.read_asset_bytes(path.clone()).await?;
+                parse_animclip(&clip_bytes)?
             }
         };
 
-        let skeleton = load_context.loader().load(serial.skeleton);
+        let skeleton = load_context.load(serial.skeleton.clone());
 
-        let clip_mine = GraphClip::from_bevy_clip(
+        Ok(GraphClip::from_bevy_clip(
             bevy_clip,
             skeleton,
             serial.event_tracks,
             Some(serial.source.clone()),
-        );
-
-        Ok(clip_mine)
+        ))
     }
 
     fn extensions(&self) -> &[&str] {

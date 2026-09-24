@@ -18,12 +18,10 @@ pub enum AssetLoaderError {
     /// A [RON](ron) Error
     #[error("Could not parse RON: {0}")]
     RonSpannedError(#[from] ron::error::SpannedError),
-    #[error("Could not load Gltf: {0}")]
-    GltfError(#[from] bevy::gltf::GltfError),
-    #[error("Could not find gltf named label: {0}")]
-    GltfMissingLabel(String),
-    #[error("Could not complete direct asset load: {0}")]
-    LoadDirectError(#[from] bevy::asset::LoadDirectError),
+    #[error("Could not read a baked .animclip: {0}")]
+    AnimClipError(#[from] crate::animation_clip::animclip::AnimClipError),
+    #[error("Could not read a referenced asset: {0}")]
+    ReadAssetBytesError(#[from] bevy::asset::ReadAssetBytesError),
     #[error("Animated scene path is incorrect: {0}")]
     AnimatedSceneMissingName(String),
     #[error(
