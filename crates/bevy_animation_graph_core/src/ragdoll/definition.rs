@@ -1,10 +1,7 @@
 use bevy::{
     asset::Asset,
     ecs::component::Component,
-    math::{
-        Isometry3d, Vec3,
-        primitives::{Capsule3d, Cuboid, Measured3d, Sphere},
-    },
+    math::{Isometry3d, Vec3}, shape::{Capsule3d, Cuboid, Measured3d, Sphere},
     platform::collections::HashMap,
     reflect::Reflect,
 };

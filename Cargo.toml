@@ -28,6 +28,7 @@ bevy_animation_graph_builtin_nodes = { version = "0.10.0", path = "./crates/bevy
 # so the runtime crates must not drag bevy_render back in through feature unification. This
 # is aurora's feature set; the editor and examples add what they need on top of it.
 bevy = { git = "https://github.com/bevyengine/bevy", branch = "main", default-features = false, features = [
+    "bevy_curve",
     "default_app",
     "default_platform",
     "common_api",

@@ -25,7 +25,7 @@ use bevy::{
     animation::{
         AnimationTargetId, VariableCurve, animated_field, animation_curves::AnimatableCurve,
     },
-    math::curve::{ConstantCurve, Interval, UnevenSampleAutoCurve},
+    curve::{ConstantCurve, Interval, UnevenSampleAutoCurve},
     prelude::*,
 };
 use thiserror::Error;
