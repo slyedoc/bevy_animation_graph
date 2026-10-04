@@ -42,7 +42,8 @@ bevy = { git = "https://github.com/bevyengine/bevy", branch = "main", default-fe
     "bevy_mesh",
     "bevy_image",
     "bevy_color",
-    "bevy_gltf",
+    # Morph weights (systems.rs); once implied by bevy_gltf, which nothing here needs.
+    "morph",
     "bevy_gizmos",
 ] }
 avian3d = { git = "https://github.com/avianphysics/avian", branch = "main", default-features = false, features = [

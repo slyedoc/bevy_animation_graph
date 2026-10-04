@@ -128,7 +128,14 @@ impl Plugin for AnimationGraphCorePlugin {
 
         app.add_systems(
             self.final_schedule,
-            (apply_animation_to_targets, animation_player_deferred_gizmos)
+            (
+                apply_animation_to_targets,
+                // Debug drawing only: an app without gizmos (a headless game, a test) skips it.
+                animation_player_deferred_gizmos
+                    .run_if(bevy::ecs::schedule::common_conditions::resource_exists::<
+                        bevy::gizmos::config::GizmoConfigStore,
+                    >),
+            )
                 .chain()
                 .in_set(AnimationGraphSet::Final),
         );
