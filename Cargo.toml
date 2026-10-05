@@ -52,12 +52,6 @@ avian3d = { git = "https://github.com/avianphysics/avian", branch = "main", defa
     "default-collider",
 ] }
 
-egui_dock = "0.18"
-egui-notify = { version = "0.21" }
-egui = { version = "0.33" }
-egui_extras = { version = "0.33", features = ["all_loaders"] }
-bevy_egui = { git = "https://github.com/slyedoc/bevy_egui", branch = "bevy-main" }
-bevy-inspector-egui = { git = "https://github.com/slyedoc/bevy-inspector-egui", branch = "bevy-main" }
 
 ron = "0.10.1"
 serde = { version = "1.0" }

@@ -34,4 +34,6 @@ pub enum AssetLoaderError {
     SkeletonColliderLoadError,
     #[error("Failed to parse a provided regular expression: {0}")]
     RegexParsingError(#[from] regex::Error),
+    #[error("Could not read a .bsn graph: {0}")]
+    Bsn(String),
 }

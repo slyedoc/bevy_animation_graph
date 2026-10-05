@@ -1,11 +1,10 @@
-pub mod loader;
-pub mod serial;
+pub mod bsn;
 
 use bevy::{
     asset::{Asset, Handle, ReflectAsset},
     math::Vec2,
     platform::collections::HashMap,
-    reflect::Reflect,
+    reflect::{Reflect, std_traits::ReflectDefault},
 };
 use bevy_animation_graph_proc_macros::UuidWrapper;
 use serde::{Deserialize, Serialize};
@@ -72,6 +71,7 @@ pub struct DirectTransition {
 }
 
 #[derive(Reflect, Debug, Clone, Default)]
+#[reflect(Default)]
 pub struct TransitionData {
     pub kind: TransitionKind,
     /// Prevents the transition from being triggered by external events.
@@ -83,6 +83,7 @@ pub struct TransitionData {
 }
 
 #[derive(Reflect, Debug, Clone, Default)]
+#[reflect(Default)]
 pub enum TransitionKind {
     #[default]
     Immediate,

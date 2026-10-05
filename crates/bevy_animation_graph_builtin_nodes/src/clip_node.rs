@@ -1,3 +1,4 @@
+use bevy::ecs::{component::Component, reflect::ReflectComponent};
 use std::any::TypeId;
 
 use bevy::{
@@ -24,8 +25,8 @@ use bevy_animation_graph_core::{
     pose::{BonePose, Pose, RootMotionDelta, RootMotionMode},
 };
 
-#[derive(Reflect, Clone, Debug, Default)]
-#[reflect(Default, NodeLike)]
+#[derive(Component, Reflect, Clone, Debug, Default)]
+#[reflect(Component, Default, NodeLike)]
 #[type_path = "bevy_animation_graph::builtin_nodes"]
 pub struct ClipNode {
     pub(crate) clip: Handle<GraphClip>,

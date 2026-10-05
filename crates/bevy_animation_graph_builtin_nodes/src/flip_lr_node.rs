@@ -1,3 +1,4 @@
+use bevy::ecs::{component::Component, reflect::ReflectComponent};
 use bevy::prelude::*;
 use bevy_animation_graph_core::{
     animation_node::{EditProxy, NodeLike, ReflectNodeLike},
@@ -8,8 +9,8 @@ use bevy_animation_graph_core::{
 };
 use serde::{Deserialize, Serialize};
 
-#[derive(Reflect, Clone, Debug, Serialize, Deserialize)]
-#[reflect(Default, NodeLike, Serialize, Deserialize)]
+#[derive(Component, Reflect, Clone, Debug, Serialize, Deserialize)]
+#[reflect(Component, Default, NodeLike, Serialize, Deserialize)]
 #[type_path = "bevy_animation_graph::builtin_nodes"]
 pub struct FlipLRNode {
     pub config: SymmetryConfig,

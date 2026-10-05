@@ -1,5 +1,4 @@
 pub mod dyn_node_like;
-pub mod serial;
 
 use std::{any::TypeId, fmt::Debug};
 

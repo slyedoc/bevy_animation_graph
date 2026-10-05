@@ -1,3 +1,4 @@
+use bevy::ecs::{component::Component, reflect::ReflectComponent};
 use bevy::{platform::collections::HashMap, prelude::*};
 use bevy_animation_graph_core::{
     animation_graph::TimeUpdate,
@@ -17,8 +18,8 @@ use serde::{Deserialize, Serialize};
 ///
 /// Useful when you synthesize some animations using the graph, but still want some event markup to
 /// apply for synchronization and/or gameplay effects.
-#[derive(Reflect, Clone, Debug, Serialize, Deserialize, Default)]
-#[reflect(Default, NodeLike, Serialize, Deserialize)]
+#[derive(Component, Reflect, Clone, Debug, Serialize, Deserialize, Default)]
+#[reflect(Component, Default, NodeLike, Serialize, Deserialize)]
 #[type_path = "bevy_animation_graph::builtin_nodes"]
 pub struct EventMarkupNode {
     pub event_tracks: HashMap<String, EventTrack>,

@@ -1,4 +1,3 @@
-pub mod serial;
 
 use bevy::prelude::{Deref, DerefMut};
 

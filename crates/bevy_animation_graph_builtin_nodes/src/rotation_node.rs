@@ -1,3 +1,4 @@
+use bevy::ecs::{component::Component, reflect::ReflectComponent};
 use bevy::{
     math::Quat,
     reflect::{Reflect, std_traits::ReflectDefault},
@@ -34,8 +35,8 @@ pub enum ChainDecay {
     Linear,
 }
 
-#[derive(Reflect, Clone, Debug)]
-#[reflect(Default, NodeLike)]
+#[derive(Component, Reflect, Clone, Debug)]
+#[reflect(Component, Default, NodeLike)]
 #[type_path = "bevy_animation_graph::builtin_nodes"]
 pub struct RotationNode {
     pub application_mode: RotationMode,

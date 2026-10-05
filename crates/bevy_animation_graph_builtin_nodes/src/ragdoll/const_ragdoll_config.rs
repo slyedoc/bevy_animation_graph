@@ -1,3 +1,4 @@
+use bevy::ecs::{component::Component, reflect::ReflectComponent};
 use bevy::reflect::{Reflect, prelude::ReflectDefault};
 use bevy_animation_graph_core::{
     animation_node::{NodeLike, ReflectNodeLike},
@@ -7,8 +8,8 @@ use bevy_animation_graph_core::{
     ragdoll::configuration::RagdollConfig,
 };
 
-#[derive(Reflect, Clone, Debug, Default)]
-#[reflect(Default, NodeLike)]
+#[derive(Component, Reflect, Clone, Debug, Default)]
+#[reflect(Component, Default, NodeLike)]
 #[type_path = "bevy_animation_graph::builtin_nodes"]
 pub struct ConstRagdollConfig {
     pub value: RagdollConfig,

@@ -1,3 +1,4 @@
+use bevy::ecs::{component::Component, reflect::ReflectComponent};
 use bevy::prelude::*;
 use bevy_animation_graph_core::{
     animation_graph::TimeUpdate,
@@ -33,8 +34,8 @@ pub struct PointElement {
 ///
 /// This node is useful, for example, to blend between directional movement and strafe animations
 /// in a shooter game.
-#[derive(Reflect, Clone, Debug, Default)]
-#[reflect(Default, NodeLike, EditProxy)]
+#[derive(Component, Reflect, Clone, Debug, Default)]
+#[reflect(Component, Default, NodeLike, EditProxy)]
 #[type_path = "bevy_animation_graph::builtin_nodes"]
 pub struct BlendSpaceNode {
     pub mode: BlendMode,

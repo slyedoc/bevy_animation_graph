@@ -6,3 +6,4 @@ fixed-post-update.dot
 fixed-post-update.pdf
 migration-tmp-dir-*
 /book/book
+.cargo/local.toml

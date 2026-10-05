@@ -1,3 +1,4 @@
+use bevy::ecs::{component::Component, reflect::ReflectComponent};
 use bevy::prelude::*;
 use bevy_animation_graph_core::{
     animation_graph::TimeUpdate,
@@ -8,8 +9,8 @@ use bevy_animation_graph_core::{
     interpolation::linear::LinearInterpolator,
 };
 
-#[derive(Reflect, Clone, Debug, Default)]
-#[reflect(Default, NodeLike)]
+#[derive(Component, Reflect, Clone, Debug, Default)]
+#[reflect(Component, Default, NodeLike)]
 #[type_path = "bevy_animation_graph::builtin_nodes"]
 pub struct LoopNode {
     pub interpolation_period: f32,

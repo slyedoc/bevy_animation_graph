@@ -1,3 +1,4 @@
+use bevy::ecs::{component::Component, reflect::ReflectComponent};
 use bevy::{
     color::LinearRgba,
     math::{Quat, Vec3},
@@ -11,8 +12,8 @@ use bevy_animation_graph_core::{
     errors::GraphError,
 };
 
-#[derive(Reflect, Clone, Debug, Default)]
-#[reflect(Default, NodeLike)]
+#[derive(Component, Reflect, Clone, Debug, Default)]
+#[reflect(Component, Default, NodeLike)]
 #[type_path = "bevy_animation_graph::builtin_nodes"]
 pub struct TwoBoneIKNode;
 

@@ -23,7 +23,10 @@ use crate::{
         spawn_animated_scenes,
     },
     animation_clip::{EntityPath, GraphClip, Interpolation, loader::GraphClipLoader},
-    animation_graph::{AnimationGraph, loader::AnimationGraphLoader},
+    animation_graph::{
+        AnimationGraph,
+        bsn::{AnimGraph, AnimGraphBsnLoader, Links, NodePosition},
+    },
     animation_graph_player::AnimationGraphPlayer,
     animation_node::AnimationNode,
     edge_data::{
@@ -37,7 +40,10 @@ use crate::{
         definition::Ragdoll, definition_loader::RagdollLoader,
     },
     skeleton::{Skeleton, loader::SkeletonLoader},
-    state_machine::high_level::{StateMachine, loader::StateMachineLoader},
+    state_machine::high_level::{
+        StateMachine,
+        bsn::{AnimFsm, AnimState, AnimTransition, FsmBsnLoader},
+    },
     symmetry::{config::SymmetryConfig, serial::SymmetryConfigSerial},
     systems::{
         RootMotionOutput, animation_player, animation_player_deferred_gizmos,
@@ -151,13 +157,19 @@ impl AnimationGraphCorePlugin {
             .init_asset_loader::<GraphClipLoader>()
             .register_asset_reflect::<GraphClip>();
         app.init_asset::<AnimationGraph>()
-            .init_asset_loader::<AnimationGraphLoader>()
-            .register_asset_reflect::<AnimationGraph>();
+            .init_asset_loader::<AnimGraphBsnLoader>()
+            .register_asset_reflect::<AnimationGraph>()
+            .register_type::<AnimGraph>()
+            .register_type::<Links>()
+            .register_type::<NodePosition>();
         app.init_asset::<AnimatedScene>()
             .init_asset_loader::<AnimatedSceneLoader>()
             .register_asset_reflect::<AnimatedScene>();
         app.init_asset::<StateMachine>()
-            .init_asset_loader::<StateMachineLoader>()
+            .init_asset_loader::<FsmBsnLoader>()
+            .register_type::<AnimFsm>()
+            .register_type::<AnimState>()
+            .register_type::<AnimTransition>()
             .register_asset_reflect::<StateMachine>();
         app.init_asset::<Skeleton>()
             .init_asset_loader::<SkeletonLoader>()
