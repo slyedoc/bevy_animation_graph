@@ -4,7 +4,7 @@ use std::any::Any;
 
 use bevy::{
     asset::{Asset, ReflectAsset},
-    log::info_span,
+    log::debug_span,
     platform::collections::{HashMap, HashSet},
     prelude::{Entity, Reflect, Vec2},
 };
@@ -874,11 +874,10 @@ impl AnimationGraph {
         ctx.node_caches_mut().mark_update_started(node.id, key);
 
         {
-            let _node_update_span = info_span!(
-                "anim_node_update",
-                name = format!("{}", node.id.uuid().hyphenated())
-            )
-            .entered();
+            // Debug, not info: one per node per player per tick, and at info the log's fmt layer
+            // formatted every one's fields (~15 % of a release build's animation time).
+            let _node_update_span =
+                debug_span!("anim_node_update", name = %node.id.uuid().hyphenated()).entered();
             node.update(
                 ctx.create_node_context(node.id, self)
                     .with_debugging(node.should_debug),

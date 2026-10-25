@@ -85,6 +85,9 @@ pub struct AnimationGraphPlayer {
     #[reflect(ignore)]
     pub(crate) debug_draw_custom: Vec<CustomRelativeDrawCommand>,
     pub(crate) entity_map: HashMap<BoneId, Entity>,
+    /// Every entity the entity map's last build walked, the root first: the map is rebuilt when
+    /// one of them changes (see `entity_map_stale`).
+    pub(crate) entity_map_visited: Vec<Entity>,
     pub(crate) queued_events: EventQueue,
     pub(crate) outputs: HashMap<PinId, DataValue>,
 

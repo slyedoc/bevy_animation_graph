@@ -1,9 +1,15 @@
 use std::collections::VecDeque;
 
 use bevy::{
-    ecs::prelude::*, gizmos::gizmos::Gizmos, log::info_span, math::prelude::*,
-    mesh::morph::MorphWeights, platform::collections::HashMap, reflect::prelude::*,
-    time::prelude::*, transform::prelude::*,
+    ecs::prelude::*,
+    gizmos::gizmos::Gizmos,
+    log::{info_span, warn_once},
+    math::prelude::*,
+    mesh::morph::MorphWeights,
+    platform::collections::HashMap,
+    reflect::prelude::*,
+    time::prelude::*,
+    transform::prelude::*,
 };
 
 use crate::{
@@ -104,31 +110,74 @@ fn extract_delta(
     }
 }
 
-fn build_entity_map(root_entity: Entity, resources: &SystemResources) -> HashMap<BoneId, Entity> {
-    let mut entity_map = HashMap::default();
+/// Whether the entity map built from `visited` no longer stands for the hierarchy under `root`:
+/// never built, an entity it visited gone or unnamed (the root excepted: an unnamed root maps
+/// nothing until it is named), or one whose name or children changed since the system last ran.
+/// `visited` holds every entity the build walked, including a sibling whose path a later sibling
+/// with the same name overwrote in the map, so the hidden one is still watched. A visited bone's
+/// own parent link is checked too: when it leaves a parent as the last child, that parent's
+/// `Children` is removed rather than changed. And a visited entity's children are checked for a
+/// new name: an unnamed child is skipped by the build, so naming it changes nothing visited.
+fn entity_map_stale(visited: &[Entity], root: Entity, resources: &SystemResources) -> bool {
+    visited.first() != Some(&root)
+        || visited
+            .iter()
+            .any(|&entity| match resources.hierarchy_changes.get(entity) {
+                Ok((name, child_of, children)) => {
+                    name.map_or(entity != root, |name| name.is_changed())
+                        || (entity != root && child_of.is_none_or(|child_of| child_of.is_changed()))
+                        || children.is_some_and(|children| {
+                            children.is_changed()
+                                || children.iter().any(|child| {
+                                    resources.hierarchy_changes.get(child).is_ok_and(
+                                        |(name, _, _)| name.is_some_and(|name| name.is_changed()),
+                                    )
+                                })
+                        })
+                }
+                Err(_) => true,
+            })
+}
 
-    let root_name = resources.names_query.get(root_entity).unwrap();
+/// Maps every named entity under `root_entity` by its path from the root, and returns every
+/// entity it walked (the root first) for [`entity_map_stale`]. An unnamed root maps nothing: bone
+/// paths start at the root's name. Of two siblings with the same name, the later one in
+/// `Children` order holds the path.
+fn build_entity_map(
+    root_entity: Entity,
+    resources: &SystemResources,
+) -> (HashMap<BoneId, Entity>, Vec<Entity>) {
+    let mut entity_map = HashMap::default();
+    let mut visited = vec![root_entity];
+
+    let Ok(root_name) = resources.names_query.get(root_entity) else {
+        warn_once!(
+            "AnimationGraphPlayer on {root_entity} has no Name: bone paths start at the root's \
+             name, so nothing is mapped until it is named"
+        );
+        return (entity_map, visited);
+    };
     let root_path = EntityPath {
         parts: vec![root_name.clone()],
     };
 
     entity_map.insert(root_path.id(), root_entity);
 
-    let root_children = resources.children_query.get(root_entity).unwrap();
-
     let mut queue: VecDeque<(Entity, EntityPath)> = VecDeque::new();
 
-    for child in root_children {
-        queue.push_back((*child, root_path.clone()));
+    if let Ok(root_children) = resources.children_query.get(root_entity) {
+        for child in root_children {
+            queue.push_back((*child, root_path.clone()));
+        }
     }
 
-    while !queue.is_empty() {
-        let (entity, parent_path) = queue.pop_front().unwrap();
+    while let Some((entity, parent_path)) = queue.pop_front() {
         let Ok(name) = resources.names_query.get(entity) else {
             continue;
         };
         let path = parent_path.child(name.clone());
         entity_map.insert(path.id(), entity);
+        visited.push(entity);
 
         if let Ok(children) = resources.children_query.get(entity) {
             for child in children {
@@ -137,7 +186,7 @@ fn build_entity_map(root_entity: Entity, resources: &SystemResources) -> HashMap
         }
     }
 
-    entity_map
+    (entity_map, visited)
 }
 
 /// System that will play all animations, using any entity with a [`AnimationGraphPlayer`]
@@ -178,9 +227,11 @@ pub fn run_animation_player(
 
     // The entity map is updated regardless of animation type.
     // Important as the entity map is relied upon for e.g. debug bone drawing
-    {
+    // Rebuilt only when the hierarchy under the root changed: a full rebuild hashes every bone's
+    // whole path, each tick, for every player.
+    if entity_map_stale(&player.entity_map_visited, root, system_resources) {
         let _entity_map_span = info_span!("build_entity_map").entered();
-        player.entity_map = build_entity_map(root, system_resources);
+        (player.entity_map, player.entity_map_visited) = build_entity_map(root, system_resources);
     }
 
     if !player.animation.is_graph() {
@@ -255,5 +306,105 @@ fn apply_morph_weights(weights: &mut [f32], new_weights: &[f32]) {
     let zipped = weights.iter_mut().zip(new_weights);
     for (morph_weight, keyframe) in zipped {
         *morph_weight = *keyframe;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use bevy::{asset::Assets, ecs::system::RunSystemOnce, prelude::*};
+
+    use super::*;
+    use crate::{
+        animation_clip::GraphClip, animation_graph::AnimationGraph, bone_mask_asset::BoneMaskAsset,
+        skeleton::Skeleton, state_machine::high_level::StateMachine,
+    };
+
+    fn world() -> World {
+        let mut world = World::new();
+        world.init_resource::<Assets<GraphClip>>();
+        world.init_resource::<Assets<AnimationGraph>>();
+        world.init_resource::<Assets<StateMachine>>();
+        world.init_resource::<Assets<Skeleton>>();
+        world.init_resource::<Assets<BoneMaskAsset>>();
+        world
+    }
+
+    fn build(world: &mut World, root: Entity) -> (HashMap<BoneId, Entity>, Vec<Entity>) {
+        world
+            .run_system_once(move |resources: SystemResources| build_entity_map(root, &resources))
+            .unwrap()
+    }
+
+    /// A staleness check that keeps its change ticks between calls, as the player's system does;
+    /// primed once, since a new system sees everything as changed.
+    fn stale_check(
+        world: &mut World,
+        root: Entity,
+        visited: Vec<Entity>,
+    ) -> impl FnMut(&mut World) -> bool + use<> {
+        let system = world.register_system(move |resources: SystemResources| {
+            entity_map_stale(&visited, root, &resources)
+        });
+        world.run_system(system).unwrap();
+        move |world| world.run_system(system).unwrap()
+    }
+
+    fn path(parts: &[&'static str]) -> BoneId {
+        EntityPath {
+            parts: parts.iter().map(|part| Name::new(*part)).collect(),
+        }
+        .id()
+    }
+
+    #[test]
+    fn a_sibling_hidden_by_a_namesake_is_still_watched() {
+        let mut world = world();
+        let root = world.spawn(Name::new("root")).id();
+        let hidden = world.spawn((Name::new("arm"), ChildOf(root))).id();
+        let shown = world.spawn((Name::new("arm"), ChildOf(root))).id();
+
+        let (map, visited) = build(&mut world, root);
+        assert_eq!(map.get(&path(&["root", "arm"])), Some(&shown));
+        assert_eq!(visited, vec![root, hidden, shown]);
+
+        let mut stale = stale_check(&mut world, root, visited);
+        assert!(!stale(&mut world));
+
+        world.spawn((Name::new("hand"), ChildOf(hidden)));
+        assert!(stale(&mut world));
+    }
+
+    #[test]
+    fn a_root_without_children_maps_itself() {
+        let mut world = world();
+        let root = world.spawn(Name::new("root")).id();
+
+        let (map, visited) = build(&mut world, root);
+        assert_eq!(map.len(), 1);
+        assert_eq!(map.get(&path(&["root"])), Some(&root));
+
+        let mut stale = stale_check(&mut world, root, visited);
+        assert!(!stale(&mut world));
+        world.spawn((Name::new("hips"), ChildOf(root)));
+        assert!(stale(&mut world));
+    }
+
+    #[test]
+    fn an_unnamed_root_maps_nothing_until_named() {
+        let mut world = world();
+        let root = world.spawn_empty().id();
+        world.spawn((Name::new("hips"), ChildOf(root)));
+
+        let (map, visited) = build(&mut world, root);
+        assert!(map.is_empty());
+        assert_eq!(visited, vec![root]);
+
+        let mut stale = stale_check(&mut world, root, visited);
+        assert!(!stale(&mut world));
+        world.entity_mut(root).insert(Name::new("root"));
+        assert!(stale(&mut world));
+
+        let (map, _) = build(&mut world, root);
+        assert_eq!(map.len(), 2);
     }
 }
