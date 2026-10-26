@@ -10,6 +10,7 @@ pub mod edge_data;
 pub mod errors;
 pub mod event_track;
 pub mod id;
+pub mod inertialization;
 pub mod interpolation;
 #[cfg(feature = "physics_avian")]
 pub mod physics_systems_avian;

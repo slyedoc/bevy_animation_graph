@@ -184,7 +184,11 @@ pub fn graph_from_world(
         };
         edges.push((source_pin(world, &link.1)?, target));
     }
-    for child in world.get::<Children>(root).map(|c| c.to_vec()).unwrap_or_default() {
+    for child in world
+        .get::<Children>(root)
+        .map(|c| c.to_vec())
+        .unwrap_or_default()
+    {
         let name = world
             .get::<Name>(child)
             .ok_or("a node has no #Name")?
@@ -230,7 +234,10 @@ pub fn graph_from_world(
 }
 
 fn links(world: &World, entity: Entity) -> Vec<Link> {
-    world.get::<Links>(entity).map(|l| l.0.clone()).unwrap_or_default()
+    world
+        .get::<Links>(entity)
+        .map(|l| l.0.clone())
+        .unwrap_or_default()
 }
 
 /// The entity's node component (the one reflecting `NodeLike`), cloned.
@@ -240,7 +247,9 @@ fn node_component(world: &World, entity: Entity, registry: &TypeRegistry) -> Opt
         let type_id = world.components().get_info(id)?.type_id()?;
         let registration = registry.get(type_id)?;
         let node_like = registration.data::<ReflectNodeLike>()?;
-        let value = registration.data::<ReflectComponent>()?.reflect(entity_ref)?;
+        let value = registration
+            .data::<ReflectComponent>()?
+            .reflect(entity_ref)?;
         let owned = value.reflect_clone().ok().or_else(|| {
             registration
                 .data::<ReflectFromReflect>()?
@@ -284,10 +293,7 @@ pub fn spawn_document(
     world.insert_resource(registry);
     world.insert_resource(server.clone());
     world.init_resource::<Assets<ScenePatch>>();
-    let root = world
-        .spawn_scene(scene)
-        .map_err(|e| format!("{e:?}"))?
-        .id();
+    let root = world.spawn_scene(scene).map_err(|e| format!("{e:?}"))?.id();
     Ok((world, root))
 }
 

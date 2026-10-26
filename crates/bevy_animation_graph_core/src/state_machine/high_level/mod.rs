@@ -95,6 +95,21 @@ pub enum TransitionKind {
         /// If set, will automatically end the transition after the given time has elapsed
         timed: Option<f32>,
     },
+    /// Plays only the target: the pose the machine was outputting decays into it over `duration`
+    /// (see [`crate::inertialization`]), so nothing evaluates the state being left.
+    Inertial { duration: f32 },
+}
+
+impl TransitionKind {
+    fn blended(&self) -> Option<(Handle<AnimationGraph>, Option<f32>, bool)> {
+        match self {
+            TransitionKind::Immediate => None,
+            TransitionKind::Graph { graph, timed } => Some((graph.clone(), *timed, false)),
+            TransitionKind::Inertial { duration } => {
+                Some((Handle::default(), Some(*duration), true))
+            }
+        }
+    }
 }
 
 /// Stateful data associated with an FSM node
@@ -260,8 +275,8 @@ impl StateMachine {
                 let transition_id = TransitionId::State(state.id);
                 for source_state in self.states.values() {
                     if source_state.id != state.id {
-                        match &state_transition.kind {
-                            TransitionKind::Immediate => {
+                        match state_transition.kind.blended() {
+                            None => {
                                 llfsm.add_transition(LowLevelTransition {
                                     id: LowLevelTransitionId::Immediate(transition_id),
                                     ignore_external: state_transition.ignore_external_events,
@@ -273,15 +288,16 @@ impl StateMachine {
                                     hl_target: state.id,
                                 });
                             }
-                            TransitionKind::Graph { graph, timed } => {
+                            Some((graph, timed, inertial)) => {
                                 llfsm.add_state(LowLevelState {
                                     id: LowLevelStateId::HlTransition(transition_id),
-                                    graph: graph.clone(),
+                                    graph,
                                     hl_transition: Some(low_level::LlTransitionData {
                                         source: source_state.id,
                                         target: state.id,
                                         hl_transition_id: transition_id,
-                                        timed: *timed,
+                                        timed,
+                                        inertial,
                                     }),
                                 });
                                 llfsm.add_transition(LowLevelTransition {
@@ -313,8 +329,8 @@ impl StateMachine {
 
         for transition in self.transitions.values() {
             let transition_id = TransitionId::Direct(transition.id);
-            match &transition.data.kind {
-                TransitionKind::Immediate => {
+            match transition.data.kind.blended() {
+                None => {
                     llfsm.add_transition(LowLevelTransition {
                         id: LowLevelTransitionId::Immediate(transition_id),
                         ignore_external: transition.data.ignore_external_events,
@@ -326,15 +342,16 @@ impl StateMachine {
                         hl_target: transition.target,
                     });
                 }
-                TransitionKind::Graph { graph, timed } => {
+                Some((graph, timed, inertial)) => {
                     llfsm.add_state(LowLevelState {
                         id: LowLevelStateId::HlTransition(transition_id),
-                        graph: graph.clone(),
+                        graph,
                         hl_transition: Some(low_level::LlTransitionData {
                             source: transition.source,
                             target: transition.target,
                             hl_transition_id: transition_id,
-                            timed: *timed,
+                            timed,
+                            inertial,
                         }),
                     });
 

@@ -170,7 +170,8 @@ impl ::bevy::reflect::structs::Struct for NodeStateBox {
         ::bevy::reflect::structs::DynamicStruct,
         ::bevy::reflect::ReflectCloneError,
     > {
-        let mut dynamic: ::bevy::reflect::structs::DynamicStruct = ::core::default::Default::default();
+        let mut dynamic: ::bevy::reflect::structs::DynamicStruct =
+            ::core::default::Default::default();
         dynamic.set_represented_type(::bevy::reflect::PartialReflect::get_represented_type_info(
             self,
         ));
@@ -196,9 +197,7 @@ impl ::bevy::reflect::PartialReflect for NodeStateBox {
         if let ::bevy::reflect::ReflectRef::Struct(struct_value) =
             ::bevy::reflect::PartialReflect::reflect_ref(value)
         {
-            for (name, value) in
-                ::bevy::reflect::structs::Struct::iter_fields(struct_value)
-            {
+            for (name, value) in ::bevy::reflect::structs::Struct::iter_fields(struct_value) {
                 if let ::core::option::Option::Some(v) =
                     ::bevy::reflect::structs::Struct::field_mut(self, name)
                 {

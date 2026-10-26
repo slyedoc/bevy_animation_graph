@@ -101,7 +101,9 @@ pub fn state_id(label: &str) -> StateId {
 /// Builds the state machine the entities under `root` describe (a spawned `.fsm.bsn`, or the
 /// entities an editor holds).
 pub fn fsm_from_world(world: &World, root: Entity) -> Result<StateMachine, String> {
-    let spec = world.get::<AnimFsm>(root).ok_or("the root carries no AnimFsm")?;
+    let spec = world
+        .get::<AnimFsm>(root)
+        .ok_or("the root carries no AnimFsm")?;
     let mut node_spec = NodeSpec::default();
     for input in &spec.inputs {
         match input {
@@ -121,7 +123,11 @@ pub fn fsm_from_world(world: &World, root: Entity) -> Result<StateMachine, Strin
     };
     let label = |entity: Entity| world.get::<Name>(entity).map(|n| n.as_str().to_string());
     let mut labels = Vec::new();
-    for child in world.get::<Children>(root).map(|c| c.to_vec()).unwrap_or_default() {
+    for child in world
+        .get::<Children>(root)
+        .map(|c| c.to_vec())
+        .unwrap_or_default()
+    {
         let name = label(child).unwrap_or_default();
         if let Some(state) = world.get::<AnimState>(child) {
             fsm.add_state(State {

@@ -1,9 +1,10 @@
 use bevy::{
     asset::Asset,
     ecs::component::Component,
-    math::{Isometry3d, Vec3}, shape::{Capsule3d, Cuboid, Measured3d, Sphere},
+    math::{Isometry3d, Vec3},
     platform::collections::HashMap,
     reflect::Reflect,
+    shape::{Capsule3d, Cuboid, Measured3d, Sphere},
 };
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;

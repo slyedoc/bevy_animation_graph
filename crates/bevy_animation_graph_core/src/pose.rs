@@ -146,24 +146,16 @@ impl BonePose {
         // Use identity defaults when the base has no value so that the
         // overlay is always scaled by alpha. Without this, a missing base
         // value causes the overlay to be injected at full strength.
-        self.rotation = either_or_mix_with_default(
-            self.rotation,
-            other.rotation,
-            Quat::IDENTITY,
-            |a, b| additive_blend_quat(a, b, alpha),
-        );
-        self.translation = either_or_mix_with_default(
-            self.translation,
-            other.translation,
-            Vec3::ZERO,
-            |a, b| a + alpha * b,
-        );
-        self.scale = either_or_mix_with_default(
-            self.scale,
-            other.scale,
-            Vec3::ZERO,
-            |a, b| a + alpha * b,
-        );
+        self.rotation =
+            either_or_mix_with_default(self.rotation, other.rotation, Quat::IDENTITY, |a, b| {
+                additive_blend_quat(a, b, alpha)
+            });
+        self.translation =
+            either_or_mix_with_default(self.translation, other.translation, Vec3::ZERO, |a, b| {
+                a + alpha * b
+            });
+        self.scale =
+            either_or_mix_with_default(self.scale, other.scale, Vec3::ZERO, |a, b| a + alpha * b);
         self.weights = either_or_mix_with_default(
             self.weights.clone(),
             other.weights.clone(),
@@ -173,24 +165,16 @@ impl BonePose {
     }
 
     pub fn linear_blend_mut(&mut self, other: &BonePose, alpha: f32) {
-        self.rotation = either_or_mix_with_default(
-            self.rotation,
-            other.rotation,
-            Quat::IDENTITY,
-            |a, b| a.slerp(b, alpha),
-        );
-        self.translation = either_or_mix_with_default(
-            self.translation,
-            other.translation,
-            Vec3::ZERO,
-            |a, b| a.lerp(b, alpha),
-        );
-        self.scale = either_or_mix_with_default(
-            self.scale,
-            other.scale,
-            Vec3::ONE,
-            |a, b| a.lerp(b, alpha),
-        );
+        self.rotation =
+            either_or_mix_with_default(self.rotation, other.rotation, Quat::IDENTITY, |a, b| {
+                a.slerp(b, alpha)
+            });
+        self.translation =
+            either_or_mix_with_default(self.translation, other.translation, Vec3::ZERO, |a, b| {
+                a.lerp(b, alpha)
+            });
+        self.scale =
+            either_or_mix_with_default(self.scale, other.scale, Vec3::ONE, |a, b| a.lerp(b, alpha));
         self.weights = either_or_mix_with_default(
             self.weights.clone(),
             other.weights.clone(),

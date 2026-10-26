@@ -22,6 +22,8 @@ use crate::{
         events::{AnimationEvent, EventQueue, SampledEvent},
     },
     errors::GraphError,
+    inertialization::InertialPose,
+    pose::Pose,
     state_machine::high_level::StateId,
 };
 
@@ -82,6 +84,41 @@ pub enum FsmBuiltinPin {
 pub struct FsmState {
     pub state: LowLevelStateId,
     pub state_entered_time: f32,
+    /// The machine's last two outputs, kept only when it has inertial transitions.
+    pub history: PoseHistory,
+    /// The running inertial transition's offsets, captured on its first frame.
+    pub inertial: Option<InertialBlend>,
+}
+
+impl FsmState {
+    fn new(state: LowLevelStateId, time: f32) -> Self {
+        Self {
+            state,
+            state_entered_time: time,
+            history: PoseHistory::default(),
+            inertial: None,
+        }
+    }
+}
+
+#[derive(Reflect, Debug, Clone, Default)]
+pub struct PoseHistory {
+    pub last: Option<PoseFrame>,
+    pub prev: Option<PoseFrame>,
+}
+
+/// The poses on the machine's pose outputs at one instant of its time.
+#[derive(Reflect, Debug, Clone, Default)]
+pub struct PoseFrame {
+    pub time: f32,
+    pub poses: HashMap<PinId, Pose>,
+}
+
+#[derive(Reflect, Debug, Clone, Default)]
+pub struct InertialBlend {
+    /// Machine time the offsets were captured at (the last output's).
+    pub start: f32,
+    pub poses: HashMap<PinId, InertialPose>,
 }
 
 #[derive(Reflect, Debug, Clone)]
@@ -90,6 +127,8 @@ pub struct LlTransitionData {
     pub target: high_level::StateId,
     pub hl_transition_id: high_level::TransitionId,
     pub timed: Option<f32>,
+    /// Plays the target's graph instead of `graph`, decaying the last output into it.
+    pub inertial: bool,
 }
 
 /// Specification of a state node in the low-level FSM
@@ -130,6 +169,8 @@ pub struct LowLevelStateMachine {
 impl LowLevelStateMachine {
     pub const DRIVER_EVENT_QUEUE: &'static str = "driver_events";
     pub const DRIVER_TIME: &'static str = "driver_time";
+    /// Output older than this is not continued from (the machine was not evaluated meanwhile).
+    const MAX_HISTORY_GAP: f32 = 0.25;
 
     pub fn new() -> Self {
         Self {
@@ -163,6 +204,42 @@ impl LowLevelStateMachine {
         }
     }
 
+    fn inertial_target(&self, state: &LowLevelStateId) -> Option<&LowLevelState> {
+        let transition = self.states.get(state)?.hl_transition.as_ref()?;
+        if !transition.inertial {
+            return None;
+        }
+        self.states
+            .get(&LowLevelStateId::HlState(transition.target))
+    }
+
+    /// The state whose graph plays: an inertial transition plays its target's.
+    fn playing_state(&self, state: &LowLevelStateId) -> &LowLevelState {
+        self.inertial_target(state)
+            .unwrap_or_else(|| self.states.get(state).unwrap())
+    }
+
+    /// The high-level state a transition request leaves from. Inertial transitions can be
+    /// interrupted (from their target); graph transitions cannot.
+    fn request_source(&self, state: &LowLevelStateId) -> Option<StateId> {
+        match state {
+            LowLevelStateId::HlState(id) => Some(*id),
+            LowLevelStateId::HlTransition(_) => {
+                self.inertial_target(state)
+                    .and_then(|target| match target.id {
+                        LowLevelStateId::HlState(id) => Some(id),
+                        LowLevelStateId::HlTransition(_) => None,
+                    })
+            }
+        }
+    }
+
+    fn has_inertial(&self) -> bool {
+        self.states
+            .values()
+            .any(|s| s.hl_transition.as_ref().is_some_and(|t| t.inertial))
+    }
+
     fn find_hl_transition_start(
         &self,
         from_hl_state: StateId,
@@ -189,10 +266,13 @@ impl LowLevelStateMachine {
         {
             *should_clear = Some((target_state.graph.id(), ll_target_state_id));
         }
-        *fsm_state = FsmState {
-            state: transition.target.clone(),
-            state_entered_time: time,
-        };
+        let keeps_elapsed = matches!(transition.id, LowLevelTransitionId::End(_))
+            && self.inertial_target(&transition.source).is_some();
+        fsm_state.state = transition.target.clone();
+        if !keeps_elapsed {
+            fsm_state.state_entered_time = time;
+        }
+        fsm_state.inertial = None;
     }
 
     fn handle_event_queue(
@@ -203,17 +283,15 @@ impl LowLevelStateMachine {
         mut ctx: NodeContext,
     ) -> Result<(), GraphError> {
         let time = ctx.time();
-        let fsm_state = ctx.state_mut_or_else(|| FsmState {
-            state: self.start_state.clone().unwrap(),
-            state_entered_time: time,
-        })?;
+        let fsm_state =
+            ctx.state_mut_or_else(|| FsmState::new(self.start_state.clone().unwrap(), time))?;
 
         let mut should_clear: Option<(AssetId<AnimationGraph>, LowLevelStateId)> = None;
 
         for event in event_queue.events {
             match event.event {
                 AnimationEvent::TransitionToState(hl_target_state_id) => {
-                    if let LowLevelStateId::HlState(hl_curr_state_id) = fsm_state.state.clone()
+                    if let Some(hl_curr_state_id) = self.request_source(&fsm_state.state)
                         && let Some(transition) = self.find_hl_transition_start(
                             hl_curr_state_id,
                             hl_target_state_id,
@@ -228,7 +306,7 @@ impl LowLevelStateMachine {
                         .hl_states_by_label
                         .get(&label)
                         .and_then(|states| states.first())
-                        && let LowLevelStateId::HlState(hl_curr_state_id) = fsm_state.state.clone()
+                        && let Some(hl_curr_state_id) = self.request_source(&fsm_state.state)
                         && let Some(transition) = self.find_hl_transition_start(
                             hl_curr_state_id,
                             *hl_target_state_id,
@@ -242,7 +320,11 @@ impl LowLevelStateMachine {
                     if let Some(transition) = self
                         .transitions
                         .get(&LowLevelTransitionId::Start(transition_id))
-                        && fsm_state.state == transition.source
+                        && self
+                            .request_source(&fsm_state.state)
+                            .map(LowLevelStateId::HlState)
+                            .as_ref()
+                            == Some(&transition.source)
                     {
                         self.trigger_transition(transition, time, fsm_state, &mut should_clear);
                     }
@@ -305,8 +387,12 @@ impl LowLevelStateMachine {
     /// Updates underlying animation graphs for active states.
     pub fn update_graph(&self, mut ctx: NodeContext) -> Result<EventQueue, GraphError> {
         let time = ctx.time();
-        let fsm_state = ctx.state::<FsmState>()?;
-        let state = self.states.get(&fsm_state.state).unwrap();
+        let (current, state_entered_time) = {
+            let fsm_state = ctx.state::<FsmState>()?;
+            (fsm_state.state.clone(), fsm_state.state_entered_time)
+        };
+        let transition = self.states.get(&current).unwrap().hl_transition.as_ref();
+        let state = self.playing_state(&current);
         let graph = ctx
             .graph_context
             .resources
@@ -316,7 +402,7 @@ impl LowLevelStateMachine {
 
         let mut io_overrides = IoOverrides::default();
 
-        let elapsed_time = time - fsm_state.state_entered_time;
+        let elapsed_time = time - state_entered_time;
 
         io_overrides
             .data
@@ -324,7 +410,7 @@ impl LowLevelStateMachine {
 
         let mut driver_event_queue = EventQueue::default();
 
-        if let Some(duration) = state.hl_transition.as_ref().and_then(|t| t.timed)
+        if let Some(duration) = transition.and_then(|t| t.timed)
             && duration > 0.
         {
             let percent = elapsed_time / duration;
@@ -354,14 +440,25 @@ impl LowLevelStateMachine {
             .create_child_context(state.graph.id(), Some(state.id.clone()))
             .with_io(&sub_io_env);
 
+        let mut outputs = Vec::new();
         for (id, _) in graph.io_spec.iter_output_data() {
             let target_pin = TargetPin::OutputData(id.clone());
             let value = graph.get_data(target_pin, sub_ctx.clone())?;
             if id == Self::DRIVER_EVENT_QUEUE {
                 driver_event_queue.extend(value.into_event_queue()?);
             } else {
-                ctx.set_data_fwd(id, value);
+                outputs.push((id.clone(), value));
             }
+        }
+
+        if self.has_inertial() {
+            let duration = transition
+                .filter(|t| t.inertial)
+                .map(|t| t.timed.unwrap_or(0.));
+            self.inertialize(&mut ctx, time, duration, &mut outputs)?;
+        }
+        for (id, value) in outputs {
+            ctx.set_data_fwd(id, value);
         }
 
         for input_pin in graph.io_spec.iter_input_times() {
@@ -375,11 +472,87 @@ impl LowLevelStateMachine {
         Ok(driver_event_queue)
     }
 
+    /// During an inertial transition (`duration` set) adds the decaying offset from the last
+    /// output onto the target's pose outputs, then records them as the newest output.
+    fn inertialize(
+        &self,
+        ctx: &mut NodeContext,
+        time: f32,
+        duration: Option<f32>,
+        outputs: &mut [(PinId, DataValue)],
+    ) -> Result<(), GraphError> {
+        let fsm_state =
+            ctx.state_mut_or_else(|| FsmState::new(self.start_state.clone().unwrap(), time))?;
+        let fresh = |frame: &PoseFrame, now: f32| {
+            let gap = now - frame.time;
+            gap > 0. && gap <= Self::MAX_HISTORY_GAP
+        };
+
+        if let Some(duration) = duration {
+            if fsm_state.inertial.is_none() {
+                let history = &fsm_state.history;
+                let blend = match history.last.as_ref().filter(|last| fresh(last, time)) {
+                    Some(last) => {
+                        let prev = history.prev.as_ref().filter(|prev| fresh(prev, last.time));
+                        let dt = prev.map_or(0., |prev| last.time - prev.time);
+                        let poses = outputs
+                            .iter()
+                            .filter_map(|(pin, value)| {
+                                let offsets = InertialPose::capture(
+                                    value.as_pose().ok()?,
+                                    last.poses.get(pin)?,
+                                    prev.and_then(|prev| prev.poses.get(pin)),
+                                    dt,
+                                    duration,
+                                );
+                                Some((pin.clone(), offsets))
+                            })
+                            .collect();
+                        InertialBlend {
+                            start: last.time,
+                            poses,
+                        }
+                    }
+                    None => InertialBlend {
+                        start: time,
+                        poses: HashMap::default(),
+                    },
+                };
+                fsm_state.inertial = Some(blend);
+            }
+            if let Some(blend) = &fsm_state.inertial {
+                let t = time - blend.start;
+                for (pin, value) in outputs.iter_mut() {
+                    if let (Some(offsets), DataValue::Pose(pose)) = (blend.poses.get(pin), value) {
+                        offsets.apply(pose, t);
+                    }
+                }
+            }
+        }
+
+        let poses = outputs
+            .iter()
+            .filter_map(|(pin, value)| Some((pin.clone(), value.as_pose().ok()?.clone())))
+            .collect();
+        let history = &mut fsm_state.history;
+        if history.last.as_ref().is_some_and(|last| last.time != time) {
+            history.prev = history.last.take();
+        }
+        history.last = Some(PoseFrame { time, poses });
+        Ok(())
+    }
+
     /// Last-resort type time update fetching.
     pub fn time_update(&self, mut ctx: NodeContext, pin: PinId) -> Result<TimeUpdate, GraphError> {
         let time = ctx.time();
         let fsm_state = ctx.state::<FsmState>()?;
-        let state = self.states.get(&fsm_state.state).unwrap();
+        let transition = self
+            .states
+            .get(&fsm_state.state)
+            .unwrap()
+            .hl_transition
+            .as_ref();
+        let state = self.playing_state(&fsm_state.state);
         let graph = ctx
             .graph_context
             .resources
@@ -397,7 +570,7 @@ impl LowLevelStateMachine {
 
         let mut driver_event_queue = EventQueue::default();
 
-        if let Some(duration) = state.hl_transition.as_ref().and_then(|t| t.timed)
+        if let Some(duration) = transition.and_then(|t| t.timed)
             && duration > 0.
         {
             let percent = elapsed_time / duration;
@@ -608,14 +781,19 @@ impl<'a> FsmIoEnv<'a> {
                 .with_state_key(ctx.state_key)
                 .with_io(&sub_graph_io);
 
-            graph.get_time_update(
-                SourcePin::InputTime(match self.current_state_role {
-                    StateRole::Source => GraphInputPin::FromFsmSource("".into()),
-                    StateRole::Target => GraphInputPin::FromFsmTarget("".into()),
-                    StateRole::Root => unreachable!(),
-                }),
-                sub_ctx,
-            )
+            let pin = graph
+                .io_spec
+                .iter_input_times()
+                .find(|pin| {
+                    matches!(
+                        (self.current_state_role, pin),
+                        (StateRole::Source, GraphInputPin::FromFsmSource(_))
+                            | (StateRole::Target, GraphInputPin::FromFsmTarget(_))
+                    )
+                })
+                .cloned()
+                .ok_or(GraphError::FSMRequestedMissingData)?;
+            graph.get_time_update(SourcePin::InputTime(pin), sub_ctx)
         } else {
             Err(GraphError::FSMRequestedMissingData)
         }

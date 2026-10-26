@@ -1,4 +1,3 @@
-
 use bevy::prelude::{Deref, DerefMut};
 
 use crate::animation_node::NodeLike;
@@ -36,11 +35,11 @@ impl ::bevy::reflect::Typed for DynNodeLike {
         static CELL: ::bevy::reflect::utility::NonGenericTypeInfoCell =
             ::bevy::reflect::utility::NonGenericTypeInfoCell::new();
         CELL.get_or_set(|| {
-            ::bevy::reflect::TypeInfo::TupleStruct(::bevy::reflect::tuple_struct::TupleStructInfo::new::<Self>(
-                &[
+            ::bevy::reflect::TypeInfo::TupleStruct(
+                ::bevy::reflect::tuple_struct::TupleStructInfo::new::<Self>(&[
                         // ::bevy::reflect::UnnamedField::new::<Box<dyn NodeLike>>(0usize),
-                    ],
-            ))
+                    ]),
+            )
         })
     }
 }

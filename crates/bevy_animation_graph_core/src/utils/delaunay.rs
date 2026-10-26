@@ -122,13 +122,26 @@ mod walk_space {
     #[test]
     fn a_point_outside_projects_onto_the_nearest_edge() {
         let points = [
-            (0., 0.), (0., 1.0), (-0.75, 0.75), (0.75, 0.75), (-0.7, 0.), (0.6, 0.),
-            (0., -1.05), (-0.975, -0.975), (0.975, -0.975), (0., 5.4), (0., 8.25),
+            (0., 0.),
+            (0., 1.0),
+            (-0.75, 0.75),
+            (0.75, 0.75),
+            (-0.7, 0.),
+            (0.6, 0.),
+            (0., -1.05),
+            (-0.975, -0.975),
+            (0.975, -0.975),
+            (0., 5.4),
+            (0., 8.25),
         ];
         let t = Triangulation::from_points_delaunay(
             points.iter().map(|&(x, y)| Vec2::new(x, y)).collect(),
         );
-        assert!(t.triangles.len() < 2 * points.len(), "{} triangles", t.triangles.len());
+        assert!(
+            t.triangles.len() < 2 * points.len(),
+            "{} triangles",
+            t.triangles.len()
+        );
         let back = t
             .find_linear_combination(Vec2::new(0., -3.))
             .into_iter()
